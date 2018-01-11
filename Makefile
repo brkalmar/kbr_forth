@@ -32,7 +32,7 @@ endif
 
 
 BIN       = brk_forth
-BIN_FORTH =
+BIN_FORTH = $(BIN).fs
 
 $(BIN) : $(BIN).S
 	$(CC) $(ASFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
