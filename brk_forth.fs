@@ -153,8 +153,8 @@ Compiling
 	: EXAMPLE_WORD ... [COMPILE] IF ... ;
 
 would compile IF into EXAMPLE_WORD instead of executing it. )
-: [COMPILE]
-IMMEDIATE ( -- ) WORD FIND >CFA , ;
+: [COMPILE] IMMEDIATE ( -- )
+            WORD FIND >CFA , ;
 
 ( Compile a recursive call to the currently compiling word. )
 : RECURSE IMMEDIATE ( -- )
@@ -279,9 +279,6 @@ is equivalent to
 ( Characters
   ========== )
 
-( TODO generate a word for each character 0x21 - 0x7E using a loop and string
-construction + CREATE + DOCOL + ' EXIT , )
-
 : '"'  ( -- c ) [ CHAR " ] LITERAL ;
 : '-'  ( -- c ) [ CHAR - ] LITERAL ;
 : '.'  ( -- c ) [ CHAR . ] LITERAL ;
@@ -349,6 +346,13 @@ construction + CREATE + DOCOL + ' EXIT , )
 ( Stack manipulation
   ================== )
 
+( Get number of cells on data stack, before this word ran. )
+: DEPTH ( -- u )
+  S0 @ DSP@ -
+  \ subtract 1 cell for S0
+  8-
+;
+
 ( Drop 2nd element. )
 : NIP ( w1 w2 -- w2 )
   SWAP
@@ -398,18 +402,20 @@ construction + CREATE + DOCOL + ' EXIT , )
     100 1 SYS_EXIT SYSCALL
     EXIT
   THEN
-
   \ drop word
   -ROT 2DROP
-  \ if in compiling mode
+
   STATE @ IF
-    \ compile LIT n
+    \ compile LIT
     ' LIT ,
+    \ compile n
     ,
+  ELSE
+    SWAP
   THEN
 
   \ restore old base
-  SWAP BASE !
+  BASE !
 ;
 
 ( Switch to base-10. )
@@ -617,7 +623,8 @@ HIDE .STACK
     TELL SPACE TAB	( a-link )
     \ switch to link pointer of next word
     @ DUP
-  REPEAT
+  REPEAT	( a-link a-link )
+  2DROP
 ;
 
 ( Print signed integer at a-addr in the current base. )
@@ -628,4 +635,245 @@ HIDE .STACK
 ( Print unsigned integer at a-addr in the current base. )
 : ?U ( a-addr )
   @ U.
+;
+
+( Strings
+  ======= )
+
+( Check whether nbeg ≤ n1 < nend or ubeg ≤ u1 < uend. )
+: WITHIN ( n1 nbeg nend -- f ) ( u1 ubeg uend -- f )
+  OVER -	( n1 nbeg nsize )
+  -ROT -	( nsize nindex )
+  U>
+;
+
+( Round c-addr up to the next cell (8-byte) boundary. )
+: ALIGNED ( c-addr -- a-addr )
+  [BINARY] 0111 +
+  [BINARY] 0111 INVERT AND
+;
+
+( Align HERE to the next cell boundary after it. )
+: ALIGN ( -- )
+  HERE @ ALIGNED HERE !
+;
+
+( Store byte c at HERE and increment HERE by 1. )
+: C, ( c -- )
+  HERE @
+  C!
+  1 HERE +!
+;
+
+( Parse the following input until the next quotation mark, store it at HERE
+  (without changing HERE), and push the start and the length of the stored
+  string on stack.  In compiling mode, compile it as LITSTRING ulen c-str
+  padding at HERE, and increment HERE to point after padding. )
+: S" IMMEDIATE ( -- c-addr ulen )
+     STATE @ IF
+       \ compile LITSTRING
+       ' LITSTRING ,
+       \ preserve address of string length	( a-len )
+       HERE @
+       \ compile dummy length
+       0 ,
+       \ read and compile string itself
+       BEGIN
+         KEY
+         DUP '"' <>
+       WHILE	( a-len c )
+         C,
+       REPEAT
+       DROP	( a-len )
+       \ calculate and save length
+       DUP
+       HERE @	( a-len a-len a-here )
+       \ subtract 8 because a-len points to start of length, not string
+       SWAP - 8-	( a-len ulen )
+       SWAP !
+       \ compile padding
+       ALIGN
+     ELSE
+       HERE @	( c-str-end )
+       \ read and store string
+       BEGIN
+         KEY
+         DUP '"' <>
+       WHILE	( c-str-end c )
+         OVER C!
+         1+
+       REPEAT
+       DROP	( c-str-end )
+       HERE @ -	( ulen )
+       HERE @ SWAP	( c-str ulen )
+     THEN
+;
+
+( Parse the following input until the next quotation mark as a string, and print
+  it to stdout.  In compiling mode, compile it as if compiling S" followed by
+  TELL. )
+: ." IMMEDIATE ( -- )
+     STATE @ IF
+       \ call S", which compiles LITSTRING ulen c-str padding
+       [COMPILE] S"
+       \ compile TELL
+       ' TELL ,
+     ELSE
+       \ read bytes and emit each one until a quotation mark is encountered
+       BEGIN
+         KEY
+         DUP '"' <>
+       WHILE
+         EMIT
+       REPEAT
+       DROP
+     THEN
+;
+
+( Constants, variables, values
+  ============================
+
+A constant is a word which pushes a constant value on stack; similarly, a
+variable is a word which pushes an address on stack, at which the contents of
+the variable may be accessed.
+
+Constants are compiled directly into their words as literals.  Variables on the
+other hand are compiled as an address literal that points to a cell allocated
+directly before the word definition in the data segment, where the contents of
+the variable are stored.
+
+	   ┌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┐
+	   ▼                                                ╎
+	┏━━━━━━━━━━┳╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍┳━━━━━━━━━━┳━━━━━━━━━━┳━━╎━━━━━━━┳━━━━━━━━━━┓
+	┃ contents ┃ header        ┃ DOCOL    ┃ LIT      ┃ address  ┃ EXIT     ┃
+	┃      8 B ┃               ┃      8 B ┃      8 B ┃      8 B ┃      8 B ┃
+	┗━━━━━━━━━━┻╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍┻━━━━━━━━━━┻━━━━━━━━━━┻━━━━━━━━━━┻━━━━━━━━━━┛
+
+
+This simple example demonstrates how FORTH-implemented global constants and
+variables are defined and used.
+
+	299_792_458 CONSTANT V_LIGHT
+	." c = " V_LIGHT . ." m/s" CR
+
+	VARIABLE DISTANCE
+	10_000_000_000_000 DISTANCE !
+
+	." It takes approximately " DISTANCE @ V_LIGHT / . ." s "
+	." for light to travel " DISTANCE ? ." m in vacuum." CR )
+
+( Compile a constant with the following word as its name with value w. )
+: CONSTANT ( w -- )
+  WORD-CUT	( c-str ulen )
+  \ header and codeword
+  CREATE
+  DOCOL ,
+  \ LIT w
+  ' LIT ,
+  ,
+  \ finish compiling
+  ' EXIT ,
+;
+
+( Allocate u bytes of memory at HERE and increase HERE to point after it.
+  a-addr is the start of the allocated memory.  HERE should be on a cell
+  boundary (a multiple of 8) to prevent any undefined behaviour. )
+: ALLOT ( u -- a-addr )
+  HERE @ SWAP	( a-start u )
+  \ increment HERE past the allocated space
+  HERE +!	( a-start )
+;
+
+( Get the number of bytes in ucells cells, i.e. multiply ucells by 8. )
+: CELLS ( ucells -- ubytes )
+  8 U*
+;
+
+( Compile a variable with the following word as its name. )
+: VARIABLE ( -- )
+  \ contents
+  1 CELLS ALLOT	( a-contents )
+  WORD-CUT	( a-contents c-str ulen )
+  \ header and codeword
+  CREATE	( a-contents )
+  DOCOL ,
+  \ LIT address
+  ' LIT ,
+  ,
+  \ finish compiling
+  ' EXIT ,
+;
+
+( A value is conceptually just like a variable, only with simpler, albeit less
+  powerful syntax.  Like constants, values push their contents directly on
+  stack.  Unlike constants, they may be modified via TO. Values are therefore
+  better suited for use cases where reads are frequent and writes are
+  infrequent.
+
+A value is compiled into its word as a literal, just like a constant.  TO
+modifies the literal itself in the word through an address to it.  The address
+is found when compiling and compiled as a literal followed by a !.
+
+	┏╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍┳━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┓
+	┃ header        ┃ DOCOL    ┃ LIT      ┃ contents ┃ EXIT     ┃ : word
+	┃               ┃      8 B ┃      8 B ┃      8 B ┃      8 B ┃   compiled
+	┗╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍┻━━━━━━━━━━┻━━━━━━━━━━┻━━━━━━━━━━┻━━━━━━━━━━┛   by VALUE
+	                                         ▲
+	                     ┌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┘
+	╺╸╺╸╺╸╺┳━━━━━━━━━━┳━━╎━━━━━━━┳━━━━━━━━━━┳╸╺╸╺╸╺╸
+	  ...  ┃ LIT      ┃ address  ┃ !        ┃  ...    : code compiled by TO
+	       ┃      8 B ┃      8 B ┃      8 B ┃
+	╺╸╺╸╺╸╺┻━━━━━━━━━━┻━━━━━━━━━━┻━━━━━━━━━━┻╸╺╸╺╸╺╸
+
+The following simple example demonstrates how values are defined and used.
+
+	54 VALUE NUMBER
+
+	: SUM_NUMBER
+	  ." n = " NUMBER . CR
+	  ." 1 + 2 + ... + n = " NUMBER NUMBER 1+ * 2 / . CR
+	;
+
+	SUM_NUMBER
+	26 TO NUMBER
+	SUM_NUMBER )
+
+( Compile a value with the following word as its name with initial value w. )
+: VALUE ( w -- )
+  WORD-CUT CREATE
+  DOCOL ,
+  ' LIT ,
+  \ the initial value w
+  ,
+  ' EXIT ,
+;
+
+( Store w in the value with the same name as the following word. )
+: TO IMMEDIATE ( w -- )
+     WORD FIND
+     >DFA 8+
+     STATE @ IF	( a-contents )
+       \ compile LIT a-contents !
+       ' LIT ,
+       ,
+       ' ! ,
+     ELSE	( w a-contents )
+       \ immediate mode: simply store w
+       !
+     THEN
+;
+
+( Add u to the value with the same name as the following word. )
+: +TO IMMEDIATE ( u -- )
+      WORD FIND
+      >DFA 8+
+      STATE @ IF
+        \ compile LIT a-contents +!
+        ' LIT ,
+        ,
+        ' +! ,
+      ELSE
+        \ immediate mode: simply add u
+        +!
+      THEN
 ;

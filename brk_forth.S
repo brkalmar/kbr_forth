@@ -451,20 +451,6 @@ code_\label :
 	   ------------------
 	*/
 
-	/* ( -- u ) Get number of cells on stack, before this word ran.
-	*/
-	define_code	STACK,	"STACK"
-	// RAX = stack size
-	mov	rax,	data_stack_top
-	sub	rax,	rsp
-	// RAX /= 8 (nr cells)
-	xor	rdx,	rdx
-	mov	rbx,	8
-	div	rbx
-	// u = RAX
-	DS_PUSH	rax
-	NEXT
-
 	/* ( w -- ) Drop top element.
 	*/
 	define_code	DROP,	"DROP"
@@ -1931,6 +1917,26 @@ _FIND:
 	pop	rsi
 	ret
 
+	/* ( -- c-word ulen ) Read next word via WORD and cut off the end to fit
+	in a dictionary entry header if too long.
+	*/
+	define_code	WORD$HYPHEN_MINUS$CUT,	"WORD-CUT"
+	call	_WORD_CUT
+	DS_PUSH	rdi
+	DS_PUSH	rcx
+	NEXT
+
+	// CALLable implementation of WORD-CUT
+	//  input:  none
+	//  output: RDI = c-word, RCX = ulen
+_WORD_CUT:
+	call	_WORD
+	cmp	rcx,	31
+	jbe	1f
+	mov	rcx,	31
+1:
+	ret
+
 	/* ( a-word -- a-codeword ) Compute address of codeword in word entry.
 	*/
 	define_code	$GREATER_THAN_SIGN$CFA,	">CFA"
@@ -2035,19 +2041,7 @@ _$COMMA$:
 	*/
 	define_word	$COLON$,	":"
 	// read next word for name
-	.8byte	__WORD
-	// check if too long
-	.8byte	DUP
-	.8byte	LIT,	31
-	.8byte	U$GREATER_THAN_SIGN$
-	// branch to 0 if length <= 31
-	.8byte	$DIGIT_ZERO$BRANCH
-1:
-	.8byte	0f - 1b
-	// length too long: replace with 31
-	.8byte	DROP
-	.8byte	LIT,	31
-0:
+	.8byte	WORD$HYPHEN_MINUS$CUT
 	// create header
 	.8byte	CREATE
 	// add codeword: DOCOL
@@ -2433,8 +2427,8 @@ interpret_error_msg_after_end:
 	jmp	[rax]
 	// NOTE: EXECUTE must not call NEXT: leave it to xt's NEXT
 
-	/* ( warg1 warg2 ... wargu u ncode -- nr ) Call syscall with numeric
-	code ncode passing u arguments (warg1, warg2, ..., wargu).  nr is the
+	/* ( warg1 warg2 ... wargu u ncode -- wr ) Call syscall with numeric
+	code ncode passing u arguments (warg1, warg2, ..., wargu).  wr is the
 	return value from the syscall.
 
 	If there are fewer arguments than the syscall takes, the behaviour is
@@ -2482,7 +2476,7 @@ interpret_error_msg_after_end:
 	DS_POP	rdi
 0:	/// u ≥ 0
 	syscall
-	// nr = RAX
+	// wr = RAX
 	DS_PUSH	rax
 	// ! restore RSI !
 	mov	rsi,	r12
