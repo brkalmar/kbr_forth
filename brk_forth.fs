@@ -248,135 +248,6 @@ is equivalent to
          [COMPILE] IF
            ;
 
-( Arithmetics
-  =========== )
-
-( Integer-divide ndividend by ndivisor. )
-: / ( ndividend ndivisor -- nquotient )
-  /MOD SWAP DROP
-;
-
-( Integer-divide udividend by udivisor. )
-: U/ ( udividend udivisor -- uquotient )
-  U/MOD SWAP DROP
-;
-
-( Compute remainder of integer-division of ndividend by ndivisor. )
-: MOD ( ndividend ndivisor -- nremainder )
-  /MOD DROP
-;
-
-( Compute remainder of integer-division of udividend by udivisor. )
-: UMOD ( udividend udivisor -- uremainder )
-  U/MOD DROP
-;
-
-( Negate n: nr = −n. )
-: NEGATE ( n -- nr )
-  0 SWAP -
-;
-
-( Characters
-  ========== )
-
-: '"'  ( -- c ) [ CHAR " ] LITERAL ;
-: '-'  ( -- c ) [ CHAR - ] LITERAL ;
-: '.'  ( -- c ) [ CHAR . ] LITERAL ;
-: '0'  ( -- c ) [ CHAR 0 ] LITERAL ;
-: ':'  ( -- c ) [ CHAR : ] LITERAL ;
-: ';'  ( -- c ) [ CHAR ; ] LITERAL ;
-: 'A'  ( -- c ) [ CHAR A ] LITERAL ;
-
-( Null. )
-: '\0' ( -- c ) 00 ;
-
-( Reverse solidus. )
-: '\\' ( -- c ) 92 ;
-
-( Bell. )
-: '\a' ( -- c ) 07 ;
-
-( Backspace. )
-: '\b' ( -- c ) 08 ;
-
-( Form feed (FF). )
-: '\f' ( -- c ) 12 ;
-
-( Line feed (LF). )
-: '\n' ( -- c ) 10 ;
-
-( Carriage return (CR). )
-: '\r' ( -- c ) 13 ;
-
-( Character tabulation. )
-: '\t' ( -- c ) 09 ;
-
-( Line tabulation. )
-: '\v' ( -- c ) 11 ;
-
-( Space. )
-: BL   ( -- c ) 32 ;
-
-( Emit a line feed. )
-: CR ( -- )
-  '\n' EMIT
-;
-
-( Emit a space. )
-: SPACE ( -- )
-  BL EMIT
-;
-
-( Emit u spaces. )
-: SPACES ( u -- )
-  BEGIN
-    DUP 0<>
-  WHILE
-    SPACE
-    1-
-  REPEAT
-  DROP
-;
-
-( Emit a character tabulation. )
-: TAB ( -- )
-  '\t' EMIT
-;
-
-( Stack manipulation
-  ================== )
-
-( Get number of cells on data stack, before this word ran. )
-: DEPTH ( -- u )
-  S0 @ DSP@ -
-  \ subtract 1 cell for S0
-  8-
-;
-
-( Drop 2nd element. )
-: NIP ( w1 w2 -- w2 )
-  SWAP
-  DROP
-;
-
-( Duplicate top element below 2nd element. )
-: TUCK ( w1 w2 -- w2 w1 w2 )
-  SWAP
-  OVER
-;
-
-( Replace u by duplicate of (u + 1)-th element after u, i.e. wu. )
-: PICK ( wu ... w1 w0 u -- wu ... w1 w0 wu )
-  \ increase u to skip element on top, i.e. u
-  1+
-  \ multiply by cell size
-  8 U*
-  \ get address of top + u
-  DSP@ +
-  \ fetch wu from address
-  @
-;
-
 ( Base manipulation
   ================= )
 
@@ -461,6 +332,127 @@ is equivalent to
 \ auxiliary word
 HIDE NUMBER-BASE
 
+( Arithmetics
+  =========== )
+
+( Integer-divide ndividend by ndivisor. )
+: / ( ndividend ndivisor -- nquotient )
+  /MOD SWAP DROP
+;
+
+( Integer-divide udividend by udivisor. )
+: U/ ( udividend udivisor -- uquotient )
+  U/MOD SWAP DROP
+;
+
+( Compute remainder of integer-division of ndividend by ndivisor. )
+: MOD ( ndividend ndivisor -- nremainder )
+  /MOD DROP
+;
+
+( Compute remainder of integer-division of udividend by udivisor. )
+: UMOD ( udividend udivisor -- uremainder )
+  U/MOD DROP
+;
+
+( Negate n: nr = −n. )
+: NEGATE ( n -- nr )
+  0 SWAP -
+;
+
+( Characters
+  ========== )
+
+( Null. )
+: '0 ( -- c ) [HEX] 00 ;
+
+( Reverse solidus. )
+: '\ ( -- c ) [HEX] 5C ;
+
+( Bell. )
+: 'a ( -- c ) [HEX] 07 ;
+
+( Backspace. )
+: 'b ( -- c ) [HEX] 08 ;
+
+( Form feed (FF). )
+: 'f ( -- c ) [HEX] 0C ;
+
+( Line feed (LF). )
+: 'n ( -- c ) [HEX] 0A ;
+
+( Carriage return (CR). )
+: 'r ( -- c ) [HEX] 0D ;
+
+( Character tabulation. )
+: 't ( -- c ) [HEX] 09 ;
+
+( Line tabulation. )
+: 'v ( -- c ) [HEX] 0B ;
+
+( Space. )
+: BL ( -- c ) [HEX] 20 ;
+
+( Emit a line feed. )
+: CR ( -- )
+  'n EMIT
+;
+
+( Emit a space. )
+: SPACE ( -- )
+  BL EMIT
+;
+
+( Emit u spaces. )
+: SPACES ( u -- )
+  BEGIN
+    DUP 0<>
+  WHILE
+    SPACE
+    1-
+  REPEAT
+  DROP
+;
+
+( Emit a character tabulation. )
+: TAB ( -- )
+  't EMIT
+;
+
+( Stack manipulation
+  ================== )
+
+( Get number of cells on data stack, before this word ran. )
+: DEPTH ( -- u )
+  S0 @ DSP@ -
+  \ subtract 1 cell for S0
+  8-
+;
+
+( Drop 2nd element. )
+: NIP ( w1 w2 -- w2 )
+  SWAP
+  DROP
+;
+
+( Duplicate top element below 2nd element. )
+: TUCK ( w1 w2 -- w2 w1 w2 )
+  SWAP
+  OVER
+;
+
+( Replace u by duplicate of (u + 1)-th element after u, i.e. wu. )
+: PICK ( wu ... w1 w0 u -- wu ... w1 w0 wu )
+  \ increase u to skip element on top, i.e. u
+  1+
+  \ multiply by cell size
+  8 U*
+  \ get address of top + u
+  DSP@ +
+  \ fetch wu from address
+  @
+;
+
 ( Printing
   ======== )
 
@@ -468,13 +460,13 @@ HIDE NUMBER-BASE
   representable as a character, c is '?' and an error message is printed. )
 : DIGIT->CHAR ( u -- c )
   DUP 10 < IF
-    '0' +
+    [ CHAR 0 ] LITERAL +
     EXIT
   THEN
 
   10 -
   DUP 26 < IF
-    'A' +
+    [ CHAR A ] LITERAL +
     EXIT
   THEN
 
@@ -550,7 +542,7 @@ HIDE NUMBER-BASE
   THEN	( fnegative unumber )
   \ print sign
   SWAP IF
-    '-' EMIT
+    [ CHAR - ] LITERAL EMIT
   THEN	( unumber )
   \ print number
   U.
@@ -616,8 +608,8 @@ HIDE .STACK
     DUP FLAG_IMMEDIATE AND SWAP	( a-link c-name ulen fimmediate ulen-byte )
     FLAG_HIDDEN AND	( a-link c-name ulen fimmediate fhidden )
     \ print flags
-    IF [ CHAR H ] LITERAL ELSE '-' THEN EMIT
-    IF [ CHAR I ] LITERAL ELSE '-' THEN EMIT
+    IF [ CHAR H ] LITERAL ELSE [ CHAR - ] LITERAL THEN EMIT
+    IF [ CHAR I ] LITERAL ELSE [ CHAR - ] LITERAL THEN EMIT
     SPACE	( a-link c-name ulen)
     \ print name
     TELL SPACE TAB	( a-link )
@@ -680,7 +672,7 @@ HIDE .STACK
        \ read and compile string itself
        BEGIN
          KEY
-         DUP '"' <>
+         DUP [ CHAR " ] LITERAL <>
        WHILE	( a-len c )
          C,
        REPEAT
@@ -698,7 +690,7 @@ HIDE .STACK
        \ read and store string
        BEGIN
          KEY
-         DUP '"' <>
+         DUP [ CHAR " ] LITERAL <>
        WHILE	( c-str-end c )
          OVER C!
          1+
@@ -722,7 +714,7 @@ HIDE .STACK
        \ read bytes and emit each one until a quotation mark is encountered
        BEGIN
          KEY
-         DUP '"' <>
+         DUP [ CHAR " ] LITERAL <>
        WHILE
          EMIT
        REPEAT
