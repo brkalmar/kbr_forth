@@ -2102,8 +2102,8 @@ _$COMMA$:
 	.8byte	HIDDEN
 	.8byte	EXIT
 
-	/* ( -- a-addr ) Get codeword pointer of next word to be entered and
-	skip next word.  Only works in compiling mode.
+	/* ( -- xt ) Get codeword pointer (execution token) of next word to be
+	entered and skip next word.  Only works in compiled words.
 	*/
 	define_code	$APOSTROPHE$,	"'"
 	// RAX = [RSI++]

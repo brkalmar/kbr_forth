@@ -158,7 +158,7 @@ would compile IF into EXAMPLE_WORD instead of executing it. )
   ======== )
 
 ( Boolean true. )
-: TRUE ( -- f ) 1 ;
+: TRUE  ( -- f ) 1 ;
 
 ( Boolean false. )
 : FALSE ( -- f ) 0 ;
@@ -764,6 +764,10 @@ variables are defined and used.
   ' EXIT ,
 ;
 
+( Address 0 in memory.  Used to semantically differentiate the integer 0 and the
+  address 0. )
+0 CONSTANT NULL
+
 ( Allocate u bytes of memory at HERE and increase HERE to point after it.
   a-addr is the start of the allocated memory.  HERE should be on a cell
   boundary (a multiple of 8) to prevent any undefined behaviour. )
@@ -1044,7 +1048,7 @@ compiles to nested if-else expressions, one if-expression for each test
 ( Start compiling a case-expression. )
 : CASE IMMEDIATE ( -- c-null )
        \ NULL to mark last IF to compile a THEN for
-       0
+       NULL
        ;
 
 ( Start compiling an execution branch of a case-expression. )
@@ -1094,7 +1098,7 @@ compiles to nested if-else expressions, one if-expression for each test
   REPEAT	( c-codeword )
   DROP
   \ not found: NULL
-  0
+  NULL
 ;
 
 ( Decompile the following word to stdout.  If the following word cannot be found
@@ -1186,3 +1190,47 @@ compiles to nested if-else expressions, one if-expression for each test
   \ finish the word
   [ CHAR ; ] LITERAL EMIT CR
 ;
+
+( Execution tokens
+  ================
+
+An execution token is a concept allowing us to store a reference to a word as a
+value which may be passed around like any other, and most importantly may be
+executed.  In this implementation, an execution token of a word is the address
+of its codeword, i.e. that obtained by >CFA.
+
+EXECUTE executes an execution token.  ' pushes the codeword pointer — that is,
+execution token — after it in a compiled word on stack (works the same way as
+LIT).  ['] does the same thing, except it pushes the execution token of the
+following word from stdin.
+
+Anonymous words are referred to via their execution tokens, as they have no
+names.
+
+	:NONAME word-definition ;
+
+works much the same way as
+
+	: word-name word-definition ;
+
+except instead of making a new dictionary entry with name word-name, it pushes
+an execution token for the new word on stack. )
+
+( Get execution token of the following word from stdin.  Only works in compiled
+  words. )
+: ['] IMMEDIATE ( -- xt )
+      \ compile LIT
+      ' LIT ,
+;
+
+( Start compilation of anonymous word; enter compiling mode.  xt is the
+  execution token of the anonymous word. )
+: :NONAME ( -- xt )
+    \ create dictionary header with empty name
+    NULL 0 CREATE
+    HERE @	( xt )
+    \ compile codeword
+    DOCOL ,
+    \ compile the anoymous word
+    ]
+  ;
