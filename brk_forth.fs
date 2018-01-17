@@ -1144,24 +1144,24 @@ compiles to nested if-else expressions, one if-expression for each test
         8+ DUP @	( a-end a-len ulen )
         SWAP 8+ SWAP	( a-end c-str ulen )
         \ emit string itself
-        2 DUP TELL
+        2DUP TELL
         \ emit end
         [ CHAR " ] LITERAL EMIT SPACE
         + ALIGNED	( a-end a-codeword-next )
         8-	( a-end a-codeword )
       ENDOF
       ' 0BRANCH OF
-        ." 0BRANCH ( "
+        ." 0BRANCH [ "
         \ print offset
         8+ DUP @	( a-end a-offset uoffset )
-        U.
-        ." ) "
+        .
+        ." , ] "
       ENDOF
       ' BRANCH OF
-        ." BRANCH ( "
+        ." BRANCH [ "
         \ print offset
-        8+ DUP @ U.
-        ." ) "
+        8+ DUP @ .
+        ." , ] "
       ENDOF
       ' ' OF
         ." ' "
