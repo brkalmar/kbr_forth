@@ -266,7 +266,7 @@ is equivalent to
 
   NUMBER
   \ if cannot parse number
-  0<> IF
+  IF
     DROP
     \ TODO instead of exiting, print PARSE ERROR: number not valid in base %u%:
     \ '%word%'
@@ -360,6 +360,38 @@ HIDE NUMBER-BASE
   0 SWAP -
 ;
 
+( Find the lesser of n1 and n2. )
+: MIN ( n1 n2 -- nmin )
+  2DUP > IF
+    SWAP
+  THEN
+  DROP
+;
+
+( Find the lesser of u1 and u2. )
+: UMIN ( u1 u2 -- umin )
+  2DUP U> IF
+    SWAP
+  THEN
+  DROP
+;
+
+( Find the greater of n1 and n2. )
+: MAX ( n1 n2 -- nmax )
+  2DUP < IF
+    SWAP
+  THEN
+  DROP
+;
+
+( Find the greater of u1 and u2. )
+: UMAX ( u1 u2 -- umax )
+  2DUP U< IF
+    SWAP
+  THEN
+  DROP
+;
+
 ( Characters
   ========== )
 
@@ -406,7 +438,7 @@ HIDE NUMBER-BASE
 ( Emit u spaces. )
 : SPACES ( u -- )
   BEGIN
-    DUP 0<>
+    DUP
   WHILE
     SPACE
     1-
@@ -422,7 +454,7 @@ HIDE NUMBER-BASE
 ( Stack manipulation
   ================== )
 
-( Get number of cells on data stack, before this word ran. )
+( Get depth data stack in bytes, before this word ran. )
 : DEPTH ( -- u )
   S0 @ DSP@ -
   \ subtract 1 cell for S0
@@ -592,32 +624,6 @@ HIDE DIGIT->CHAR
 
 \ auxiliary word
 HIDE .STACK
-
-( Print words in dictionary, newest to oldest.  Useful for debugging. )
-: .DICTIONARY ( -- )
-  \ initial link pointer
-  LATEST
-  @ DUP	( a-link a-link )
-  BEGIN
-    \ while a-link is not NULL
-    DUP 0<>
-  WHILE
-    8+ DUP 1+	( a-link c-len c-name )
-    SWAP C@	( a-link c-name ulen-byte )
-    DUP FLAG_LENGTH_MASK AND SWAP	( a-link c-name ulen ulen-byte )
-    DUP FLAG_IMMEDIATE AND SWAP	( a-link c-name ulen fimmediate ulen-byte )
-    FLAG_HIDDEN AND	( a-link c-name ulen fimmediate fhidden )
-    \ print flags
-    IF [ CHAR H ] LITERAL ELSE [ CHAR - ] LITERAL THEN EMIT
-    IF [ CHAR I ] LITERAL ELSE [ CHAR - ] LITERAL THEN EMIT
-    SPACE	( a-link c-name ulen)
-    \ print name
-    TELL SPACE TAB	( a-link )
-    \ switch to link pointer of next word
-    @ DUP
-  REPEAT	( a-link a-link )
-  2DROP
-;
 
 ( Print signed integer at a-addr in the current base. )
 : ? ( a-addr )
@@ -868,4 +874,324 @@ The following simple example demonstrates how values are defined and used.
         \ immediate mode: simply add u
         +!
       THEN
+;
+
+( Printing
+  ======== )
+
+( Print the name of the word in the dictionary entry at a-word. )
+: ID. ( a-word -- )
+  8+	( a-len-byte )
+  DUP 1+ SWAP	( c-name a-len-byte )
+  C@ FLAG_LENGTH_MASK AND	( c-name ulen )
+  \ print name
+  TELL
+;
+
+( Check whether the dictionary entry at a-word is hidden. )
+: ?HIDDEN ( a-word -- f )
+  8+
+  C@ FLAG_HIDDEN AND
+;
+
+( Check whether the dictionary entry at a-word is immediate. )
+: ?IMMEDIATE ( a-word -- f )
+  8+
+  C@ FLAG_IMMEDIATE AND
+;
+
+( Print all words in dictionary, newest to oldest, skipping hidden words.
+  Useful for debugging. )
+: WORDS ( -- )
+  \ initial link pointer
+  LATEST @	( a-word )
+  BEGIN
+    \ while a-word is not NULL
+    ?DUP
+  WHILE
+    DUP ?HIDDEN UNLESS
+      DUP ID.
+      TAB
+      THEN
+    \ continue to next word
+    @	( a-word )
+  REPEAT
+;
+
+( Delete the word with the following word as its name, and all other words
+  defined and memory allocated more recently than that word. )
+: FORGET ( -- )
+  WORD FIND
+  \ set LATEST to previous word in dictionary
+  DUP @ LATEST !
+  \ set HERE to start of word
+  HERE !
+;
+
+( Number of bytes DUMP prints per line.  DUMP rounds it up to the next multiple
+  of 8. )
+16 VALUE DUMP-LINE-BYTES
+
+( Dump the ulen bytes at c-start in memory in a hexadecimal format. )
+: DUMP ( c-start ulen -- )
+  BASE @ -ROT	( ubase c-addr ulen )
+  HEX
+
+  BEGIN
+    \ while ulen is not 0
+    ?DUP
+  WHILE
+    \ print address
+    OVER 8 U.R 2 SPACES
+
+    \ find number of bytes to print
+    DUP DUMP-LINE-BYTES ALIGNED UMIN	( ubase c-addr ulen ubytes )
+    \ preserve it on return stack
+    >R	( ubase c-addr ulen )
+
+    \ print up to next 16 bytes as hexadecimal numbers
+    OVER RSP@ @	( ubase c-addr ulen c-addr ubytes )
+    BEGIN
+      \ while ubytes is not 0
+      ?DUP
+    WHILE
+      \ additional space between quadwords
+      \ DUP 8 UMOD 7 = IF
+      \   SPACE
+      \ THEN
+      \ print byte
+      SWAP
+      DUP C@
+      2 U.R SPACE
+      \ increase c-addr, decrease ubytes
+      1+ SWAP 1-
+    REPEAT
+    DROP	( ubase c-addr ulen )
+
+    \ pad between hexadecimal and ASCII
+    DUMP-LINE-BYTES ALIGNED RSP@ @ -	( ubase c-addr ulen ubytes-left )
+    \ 3 spaces for each byte, plus 1 space so the gap is at least 2-wide
+    3 * 1+	( ubase c-addr ulen upadding )
+    SPACES	( ubase c-addr ulen )
+
+    \ print up to next 16 bytes as ASCII characters
+    OVER RSP@ @	( ubase c-addr ulen c-addr ubytes )
+    BEGIN
+      ?DUP
+    WHILE
+      SWAP
+      DUP C@
+      DUP BL [HEX] 80 WITHIN IF
+        \ printable: emit
+        EMIT
+      ELSE
+        \ not printable: emit a dot
+        DROP
+        [ CHAR . ] LITERAL EMIT
+      THEN
+      1+ SWAP 1-	( ubase c-addr ulen c-addr ubytes )
+    REPEAT
+    DROP	( ubase c-addr ulen )
+
+    \ finish line
+    CR
+
+    \ decrease ulen and increase c-addr by ubytes
+    R> TUCK	( ubase c-addr ubytes ulen ubytes )
+    -	( ubase c-addr ubytes ulen-new )
+    -ROT + SWAP	( ubase c-addr-new ulen-new )
+  REPEAT
+  DROP	( ubase )
+
+  BASE !
+;
+
+( Control flow
+  ============
+
+Case-expressions
+----------------
+
+A case-expression may be used if there are multiple possible branches of
+execution depending on top of stack.  CASE consists of 0 or more tests and
+corresponding branches of execution, and an optional default-branch.  CASE
+executes each test in turn, then compares top two elements and executes the
+first branch where they are equal.  If none matches, the default-branch — if any
+— is executed.
+
+Top of stack is popped before execution of the branch, except for the
+default-branch, in which it is accessible and popped only after execution.  In
+any case, top of stack will have been popped after ENDCASE.
+
+	CASE
+		test-1 OF branch-1 ENDOF
+		test-2 OF branch-2 ENDOF
+		...
+		test-n OF branch-n ENDOF
+		branch-default
+	ENDCASE
+
+compiles to nested if-else expressions, one if-expression for each test
+
+	test-1 OVER = IF
+		DROP branch-1
+	ELSE
+		test-2 OVER = IF
+			DROP branch-2
+		ELSE
+			...
+				test-n OVER = IF
+					DROP branch-n
+				ELSE
+					branch-default
+					DROP
+				THEN
+			...
+		THEN
+	THEN )
+
+( Start compiling a case-expression. )
+: CASE IMMEDIATE ( -- c-null )
+       \ NULL to mark last IF to compile a THEN for
+       0
+       ;
+
+( Start compiling an execution branch of a case-expression. )
+: OF IMMEDIATE ( -- c-offset-false )
+     ' OVER ,
+     ' = ,
+     [COMPILE] IF
+     ' DROP ,
+     ;
+
+( End compiling an execution branch of a case-expression, start compiling the
+  next test or the default-branch. )
+: ENDOF IMMEDIATE ( c-offset-false -- c-offset-rest )
+        [COMPILE] ELSE
+       ;
+
+( End compiling a case-expression. )
+: ENDCASE IMMEDIATE
+          ( c-null c-offset-rest-1 c-offset-rest-2 ... c-offset-rest-n -- )
+          ' DROP ,
+          BEGIN
+            \ while current offset is not NULL
+            ?DUP
+          WHILE
+            \ compile matching THEN
+            [COMPILE] THEN
+          REPEAT
+       ;
+
+( Decompiling
+  =========== )
+
+( Find the dictionary entry that c-codeword points into.  a-word is NULL if
+  c-codeword does not point into any word. )
+: CFA> ( c-codeword -- a-word )
+  LATEST @	( c-codeword a-current )
+  BEGIN
+    ?DUP
+  WHILE
+    2DUP SWAP	( c-codeword a-current a-current c-codeword )
+    < IF	( c-codeword a-current )
+      \ match: most recent word that starts before c-codeword
+      NIP	( a-current )
+      EXIT
+    THEN
+    @
+  REPEAT	( c-codeword )
+  DROP
+  \ not found: NULL
+  0
+;
+
+( Decompile the following word to stdout.  If the following word cannot be found
+  in the dictionary or is assembly-implemented, the behaviour is undefined. )
+: SEE ( -- TODO )
+  \ find dictionary entry
+  WORD FIND
+
+  \ find next entry after the entry being decompiled: start of next entry is
+  \ approximately the end of the word's entry
+  HERE @
+  LATEST @	( a-word a-next a-current )
+  BEGIN
+    \ while current is not the word being decompiled
+    2 PICK OVER	( a-word a-last a-current a-word a-current )
+    <>
+  WHILE
+    \ step back in dictionary: next <- current, current <- word before current
+    NIP
+    DUP @	( a-word a-next a-current )
+  REPEAT
+  DROP SWAP	( a-end a-start )
+
+  \ print `: WORD-NAME` and optionally `IMMEDIATE`
+  [ CHAR : ] LITERAL EMIT SPACE
+  DUP ID. SPACE
+  DUP ?IMMEDIATE IF ." IMMEDIATE " THEN
+
+  \ start printing codeword pointers
+  >DFA	( a-end a-codeword-ptr )
+  BEGIN
+    \ while not at the end
+    2DUP >
+  WHILE
+    DUP @	( a-end a-codeword-ptr a-codeword )
+    \ handle special words
+    CASE
+      ' LIT OF
+        \ just print the literal
+        8+ DUP @
+        .
+      ENDOF
+      ' LITSTRING OF
+        \ just print the string literal
+        \ emit start
+        [ CHAR S ] LITERAL EMIT [ CHAR " ] LITERAL EMIT SPACE
+        8+ DUP @	( a-end a-len ulen )
+        SWAP 8+ SWAP	( a-end c-str ulen )
+        \ emit string itself
+        2 DUP TELL
+        \ emit end
+        [ CHAR " ] LITERAL EMIT SPACE
+        + ALIGNED	( a-end a-codeword-next )
+        8-	( a-end a-codeword )
+      ENDOF
+      ' 0BRANCH OF
+        ." 0BRANCH ( "
+        \ print offset
+        8+ DUP @	( a-end a-offset uoffset )
+        U.
+        ." ) "
+      ENDOF
+      ' BRANCH OF
+        ." BRANCH ( "
+        \ print offset
+        8+ DUP @ U.
+        ." ) "
+      ENDOF
+      ' ' OF
+        ." ' "
+        \ print word whose codeword address ' is getting
+        8+ DUP @	( a-end a-codeword-ptr a-codeword-following )
+        CFA> ID. SPACE	( a-end a-codeword-ptr )
+      ENDOF
+      ' EXIT OF
+        \ print EXIT if not at the end of the word
+        2DUP 8+ <> IF
+          ." EXIT "
+        THEN
+      ENDOF
+      \ not a special word: just print it
+      DUP CFA>
+      ID. SPACE
+    ENDCASE
+    8+
+  REPEAT	( a-end a-codeword-ptr )
+  2DROP
+
+  \ finish the word
+  [ CHAR ; ] LITERAL EMIT CR
 ;
