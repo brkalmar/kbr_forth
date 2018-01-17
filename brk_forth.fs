@@ -106,15 +106,6 @@
           ,
 ;
 
-\ Characters
-\ ==========
-
-\ ( -- c ) Left parenthesis.
-: '('  [ CHAR ( ] LITERAL ;
-
-\ ( -- c ) Right parenthesis.
-: ')'  [ CHAR ) ] LITERAL ;
-
 \ Comments
 \ ========
 
@@ -127,12 +118,12 @@
       \ read next character
       KEY
       \ left parenthesis: increase depth
-      DUP '(' = IF
+      DUP [ CHAR ( ] LITERAL = IF
         DROP
         1+
       ELSE
         \ right parenthesis: decrease depth
-        ')' = IF
+        [ CHAR ) ] LITERAL = IF
           1-
         THEN
       THEN
