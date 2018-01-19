@@ -1234,3 +1234,161 @@ an execution token for the new word on stack. )
     \ compile the anoymous word
     ]
   ;
+
+( Exceptions
+  ==========
+
+An exception is just a non-zero signed integer.  Negative integers are reserved
+for ANSI-FORTH-defined exceptions.
+
+CATCH runs an execution token, after pushing data stack pointer to directly
+below the execution token, and address of EXCEPTION-MARKER, on return stack.
+
+	       ┏━━━━━━━━━━━━━━━━━━━━━━━━━┓
+	       ┃ EXCEPTION-MARKER        ┃
+	       ┣━━━━━━━━━━━━━━━━━━━━━━━━━┫
+	  −  │ ┃ data stack pointer      ┃
+	     │ ┣━━━━━━━━━━━━━━━━━━━━━━━━━┫
+	addr │ ┃ return address of CATCH ┃
+	     │ ┣━━━━━━━━━━━━━━━━━━━━━━━━━┫
+	  +  ▼ ╏  .                      ╏
+	       ╏  .                      ╏
+	       ╻  .                      ╻
+	       ╻                         ╻
+
+
+THROW unwinds the return stack until it finds the first EXCEPTION-MARKER, and
+restores the data stack pointer stored under it; after this it pushes the
+exception integer on data stack.  If THROW does not find an EXCEPTION-MARKER
+during stack unwinding (i.e. it is uncaught), it prints an error message and
+QUITs.  If no exception is thrown in the word run by CATCH, top of return stack
+— EXCEPTION-MARKER — is returned to as normally, which pushes 0 on data stack.
+
+In any case, the exception marker and data stack pointer are dropped from return
+stack, so execution continues with the next word after CATCH.
+
+This effectively makes exceptions straightforward, albeit simple.  After a
+CATCH, top of stack is either 0 if no exception occured, or the exception
+integer.  In the former case, the rest of data stack may be used as after a
+regular execution of the execution token.  In the latter case, the rest of data
+stack is restored to have as many cells as before the CATCH, but the parameters
+of the execution token may have been modified and in general have undefined
+values.
+
+	parameter-1 parameter-2 ... parameter-n xt CATCH
+	?DUP IF
+		\ exception ne caught
+		( wundefined-1 wundefined-2 ... wundefined-n ne )
+		caught-part
+		( wundefined-1 wundefined-2 ... wundefined-n )
+		n NDROP
+	ELSE
+		\ no exception caught
+		( wreturn-1 wreturn-2 ... wreturn-m )
+		normal-part
+	THEN
+	rest
+
+Throwing exceptions is as simple as
+
+	exception-integer THROW )
+
+( Push 0 on stack, and return normally from this exception stack frame to after
+  the catch. )
+: EXCEPTION-MARKER ( -- n )
+  RDROP
+  0
+;
+
+( Execute xt with the parameters.  If no uncaught exception was thrown inside
+  xt, push xt's return values and nzero.  If an uncaught exception was thrown
+  inside xt, push n undefined cells and nexception. )
+: CATCH ( wparam1 wparam2 ... wparamn xt -- wret1 wret2 ... wretm nzero )
+  ( wparam1 wparam2 ... wparamn xt -- wundef1 wundef2 ... wundefn nexception )
+  \ 8+ to skip over xt
+  DSP@ 8+ >R
+  \ 8+ to jump directly into EXCEPTION-MARKER
+  ' EXCEPTION-MARKER 8+ >R
+  EXECUTE
+;
+
+( Throw exception n.  If n is 0, do nothing. )
+: THROW ( n -- ? )
+  \ exit if n is 0
+  ?DUP UNLESS
+    EXIT
+  THEN
+
+  \ unwind stack
+  RSP@	( n a-return )
+  BEGIN
+    \ while not at bottom of return stack
+    DUP [ R0 8- ] LITERAL <
+  WHILE
+    \ if found EXCEPTION-MARKER
+    DUP @ ' EXCEPTION-MARKER 8+ = IF
+      8+	( n a-a-dsp-old )
+      \ set return stack pointer to return address of CATCH
+      \  and get frame's data stack pointer
+      RSP! R>	( n a-dsp-old )
+      \ preserve n
+      SWAP >R
+      \ restore frame's data stack pointer
+      DSP!
+      \ store n
+      R>
+      EXIT
+    THEN
+    8+	( n a-return-next )
+  REPEAT
+
+  \ uncaught exception
+  DROP	( n )
+  CASE
+     \ exception -1: ABORT
+    -1 OF
+      ." ABORTED" CR
+    ENDOF
+    \ other exception
+    ." UNCAUGHT THROW: " DUP . CR
+  ENDCASE
+  QUIT
+;
+
+( Throw abort exception: -1. )
+: ABORT ( -- )
+  -1 THROW
+;
+
+( Print stack trace from current position to bottom of return stack. )
+: PRINT-STACK-TRACE ( -- )
+  RSP@	( a-return )
+  BEGIN
+    DUP [ R0 8- ] LITERAL <
+  WHILE
+    DUP @ CASE
+      \ exception stack frame
+      ' EXCEPTION-MARKER 8+ OF
+        ." CATCH ( DSP = "
+        \ print and skip over data stack pointer
+        8+
+        DUP @ U.
+        ."  ) "
+      ENDOF
+      \ return address
+      DUP CFA>	( a-return a-codeword a-word )
+      ?DUP IF
+        2DUP	( a-return a-codeword a-word a-codeword a-word )
+        \ print word name
+        ID.	( a-return a-codeword a-word a-codeword )
+        ."  + "
+        \ print offset
+        SWAP >DFA 8+ -	( a-return a-codeword uoffset )
+        .
+      THEN
+    ENDCASE	( a-return )
+    TAB
+    8+
+  REPEAT
+  DROP
+;
