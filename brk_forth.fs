@@ -108,6 +108,9 @@
 
 \ Comments
 \ ========
+\
+\ TODO first ()-comment(s) in word saved docstring-like for stack effects and
+\ documentation
 
 \ ( -- ) Start a multiline comment, which lasts until the corresponding right
 \ parenthesis.  Nested parenthesis are allowed.
@@ -655,10 +658,14 @@ HIDE .STACK
 ;
 
 ( Parse the following input until the next quotation mark, store it at HERE
-  (without changing HERE), and push the start and the length of the stored
-  string on stack.  In compiling mode, compile it as LITSTRING ulen c-str
-  padding at HERE, and increment HERE to point after padding. )
-: S" IMMEDIATE ( -- c-addr ulen )
+  without changing HERE, and push the start and the length of the stored string
+  on stack.  c-str is stored at HERE and could be overwritten by anything that
+  uses HERE.  In compiling mode, compile it as
+
+	LITSTRING ulen c-str padding
+
+at HERE, and increment HERE to point after padding. )
+: S" IMMEDIATE ( -- c-str ulen )
      STATE @ IF
        \ compile LITSTRING
        ' LITSTRING ,
@@ -676,7 +683,7 @@ HIDE .STACK
        DROP	( a-len )
        \ calculate and save length
        DUP
-       HERE @	( a-len a-len a-here )
+       HERE @	( a-len a-len c-end )
        \ subtract 8 because a-len points to start of length, not string
        SWAP - 8-	( a-len ulen )
        SWAP !
@@ -1391,4 +1398,91 @@ Throwing exceptions is as simple as
     8+
   REPEAT
   DROP
+;
+
+( C strings
+  =========
+
+A C string is just a pointer to a byte sequence, where the NULL-byte 0x00 marks
+the end.
+
+FORTH strings are created via S" ..." and C strings via Z" ...".  Converting
+from a FORTH to a C string is done via CSTRING; converting from a C string to a
+FORTH string is done using STRLEN, via the expression DUP STRLEN. )
+
+( Parse the following input until the next quotation mark, store it followed by
+  a terminating NULL byte at HERE without changing HERE, and push the start of
+  the stored string on stack.  c-str-z is stored at HERE and could be
+  overwritten by anything that uses HERE.  In compiling mode, compile it as
+
+	LITSTRING ulen c-str-z padding DROP
+
+at HERE, and increment HERE to point after padding. )
+: Z" IMMEDIATE ( -- c-str-z )
+     STATE @ IF
+       \ LITSTRING
+       ' LITSTRING ,
+       HERE @	( a-len )
+       \ dummy length
+       0 ,
+       \ the string
+       BEGIN
+         KEY
+         DUP [ CHAR " ] LITERAL <>
+       WHILE	( a-len c )
+         C,
+       REPEAT
+       DROP	( a-len )
+       \ terminating NULL byte
+       '0 C,
+       \ calculate and save length
+       DUP HERE @	( a-len a-len c-end )
+       SWAP - 8-	( a-len ulen )
+       SWAP !
+       \ padding
+       ALIGN
+       \ DROP to drop ulen after LITSTRING pushed it
+       ' DROP ,
+     ELSE
+       HERE @	( c-str-z-end )
+       \ the string
+       BEGIN
+         KEY
+         DUP [ CHAR " ] LITERAL <>
+       WHILE	( c-str-z-end c )
+         OVER C!
+         1+
+       REPEAT
+       DROP	( c-str-z-end )
+       \ terminating NULL byte
+       '0 SWAP C!
+       HERE @	( c-str-z )
+     THEN
+;
+
+( Count the length of a C string, i.e. the number of bytes starting at c-str-z
+  and not including the terminating NULL byte. )
+: STRLEN ( c-str-z -- ulen )
+  \ preserve start
+  DUP
+  BEGIN
+    DUP C@ 0<>
+  WHILE
+    1+	( c-str-z c-current )
+  REPEAT	( c-str-z c-end )
+  SWAP -	( ulen )
+;
+
+( Convert FORTH string to C string.  c-str-z is stored at HERE and could be
+  overwritten by anything that uses HERE. )
+: CSTRING ( c-str ulen -- c-str-z )
+  SWAP OVER	( ulen c-str ulen )
+  \ copy the string to HERE
+  HERE @ SWAP	( ulen c-str c-str-z ulen )
+  CMOVE	( ulen )
+  \ append terminating NULL byte
+  HERE @ +
+  '0 SWAP C!
+  \ push c-str-z
+  HERE @
 ;
