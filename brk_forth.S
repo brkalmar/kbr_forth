@@ -2370,6 +2370,9 @@ _$COMMA$:
 	/// RDX = nbyte = min(key_buffer_current - key_buffer, ERROR_CONTEXT)
 	mov	rdx,	rsi
 	sub	rdx,	offset key_buffer
+	// jump if there is nothing to print
+	test	rdx,	rdx
+	jz	8f
 	// jump if (current - buffer) <= ERROR_CONTEXT
 	cmp	rdx,	var_INTERPRET_ERROR_CONTEXT
 	jbe	7f
@@ -2378,9 +2381,12 @@ _$COMMA$:
 7:
 	/// RSI = buf = current - nbyte: print nbyte bytes preceding current
 	sub	rsi,	rdx
+	// nbyte--: do not print terminating whitespace
+	dec	rdx
 	mov	rax,	__NR_write
 	syscall
 	//  NOTE: no need to check return value
+8:
 	//// print error message after
 	/// EDI = fildes = 2 /* STDERR_FILENO */
 	mov	edi,	2
@@ -2401,7 +2407,7 @@ interpret_error_msg_before:
 interpret_error_msg_before_end:
 
 interpret_error_msg_after:
-	.ascii	"<<<\n"
+	.ascii	" <<<\n"
 interpret_error_msg_after_end:
 
 	/* Miscellaneous
