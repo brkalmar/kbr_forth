@@ -1569,8 +1569,8 @@ envp[n] is NULL. )
 ( Exit the program normally. )
 : BYE ( -- )
   \ exit status 0
-  0 1
-  SYS_EXIT SYSCALL
+  0
+  1 SYS_EXIT SYSCALL
 ;
 
 ( Attempt to set new break via syscall brk.  If brk succeeds, a-break is greater
@@ -1599,3 +1599,70 @@ envp[n] is NULL. )
   DUP BRK	( a-break-new a-break )
   U<=	( fsuccess )
 ;
+
+( Files
+  ===== )
+
+( File access mode for opening read-only. )
+: R/O ( -- naccess-mode ) O_RDONLY ;
+
+( File access mode for opening read-write. )
+: R/W ( -- naccess-mode ) O_RDWR ;
+
+( If n negative, nerrno is −n, otherwise nerrno is 0. )
+: WITH-ERRNO ( n -- n nerrno )
+  DUP	( n n )
+  DUP 0< IF
+    NEGATE	( n nerrno )
+  ELSE
+    DROP 0	( n 0 )
+  THEN
+;
+
+( Open file with filename c-str ulen and the file access modes in the bits of
+  naccess-modes.  If the file was opened successfully, nerrno is 0 and nfd is
+  the file descriptor.  Otherwise, nerrno is non-0 and nfd is indeterminate. )
+: OPEN-FILE ( c-str ulen naccess-modes -- nfd nerrno )
+  -ROT CSTRING SWAP	( c-str-z naccess-modes )
+  2 SYS_OPEN SYSCALL	( nfd )
+  WITH-ERRNO
+;
+
+( Create and open write-only a new empty file with filename c-str ulen,
+  truncating if it already exists.  If the file was created and opened
+  successfully, nerrno is 0 and nfd is the file descriptor.  Otherwise, nerrno
+  is non-0 and nfd is indeterminate. )
+: CREATE-FILE ( c-str ulen -- nfd nerrno )
+  CSTRING
+  [OCTAL] 644	( c-str-z nmode-bits )
+  2 SYS_CREAT SYSCALL	( nfd )
+  WITH-ERRNO
+;
+
+( Close file with file descriptor nfd.  nerrno is 0 on success, non-0 on
+  failure. )
+: CLOSE-FILE ( nfd -- nerrno )
+  1 SYS_CLOSE SYSCALL
+  NEGATE
+;
+
+( Read up to ucount bytes from nfd to c-buffer.  If successful, nerrno is 0 and
+  uread is the number of bytes actually read (0 on end-of-file).  Otherwise,
+  nerrno is non-0 and uread is indeterminate. )
+: READ-FILE ( c-buffer ucount nfd -- uread nerrno )
+  -ROT
+  3 SYS_READ SYSCALL	( nread )
+  WITH-ERRNO
+;
+
+( Write up to ucount bytes from c-buffer to nfd, unbuffered.  If successful,
+  nerrno is 0 and uwritten is the number of bytes actually written (which may be
+  0).  Otherwise, nerrno is non-0 and uwritten is indeterminate. )
+: WRITE-FILE ( c-buffer ucount nfd -- uwritten nerrno )
+  -ROT
+  3 SYS_WRITE SYSCALL	( nwritten )
+  WITH-ERRNO
+;
+
+\ auxiliary word
+HIDE WITH-ERRNO
