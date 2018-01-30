@@ -1486,3 +1486,116 @@ at HERE, and increment HERE to point after padding. )
   \ push c-str-z
   HERE @
 ;
+
+( The environment
+  ===============
+
+S0 is initialized to the top of stack at program startup, which is where the
+environment of the program is passed in from the OS.
+
+	       ╹                ╹
+	       ╹  .             ╹
+	       ╏  .             ╏
+	       ╏ stack          ╏
+	       ╏  .             ╏
+	       ╏  .             ╏
+	       ┣━━━━━━━━━━━━━━━━┫
+	       ┃ argc           ┃◀ ── S0
+	       ┣━━━━━━━━━━━━━━━━┫
+	       ┃ argv[0]        ┃
+	       ┣━━━━━━━━━━━━━━━━┫
+	       ┃ argv[1]        ┃
+	  −  │ ┣━━━━━━━━━━━━━━━━┫
+	     │ ╏  .             ╏
+	addr │ ╏  .             ╏
+	     │ ╏  .             ╏
+	  +  ▼ ┣━━━━━━━━━━━━━━━━┫
+	       ┃ argv[argc – 1] ┃
+	       ┣━━━━━━━━━━━━━━━━┫
+	       ┃ NULL           ┃
+	       ┣━━━━━━━━━━━━━━━━┫
+	       ┃ envp[0]        ┃
+	       ┣━━━━━━━━━━━━━━━━┫
+	       ┃ envp[1]        ┃
+	       ┣━━━━━━━━━━━━━━━━┫
+	       ╏  .             ╏
+	       ╏  .             ╏
+	       ╏  .             ╏
+	       ┣━━━━━━━━━━━━━━━━┫
+	       ┃ envp[n – 1]    ┃
+	       ┣━━━━━━━━━━━━━━━━┫
+	       ┃ NULL           ┃
+	       ┗━━━━━━━━━━━━━━━━┛
+
+argc is a 64-bit unsigned integer storing the number of elements in argv.
+argv[0] through argv[argc – 1] are pointers to C strings containing the program
+arguments.  argv[argc] is NULL.  envp[0] through envp[n – 1] are pointers to C
+strings containing the environment variables and their values, each of the form
+
+	<name> "=" <value>
+
+envp[n] is NULL. )
+
+( Get number of arguments to the program, including the name of the program. )
+: ARGC ( -- uargc )
+  S0 @ @
+;
+
+( Get u-th argument to the program, the 0-th being the program name. )
+: ARGV ( u -- c-str ulen )
+  1+ CELLS	( uoffset )
+  S0 @	( uoffset a-argv-0 )
+  + @	( c-argv-u-z )
+  DUP STRLEN	( c-argv-u ulen )
+;
+
+( Get start of environment variable pointer array. )
+: ENVIRON ( -- a-envp-0 )
+  ARGC 2 + CELLS	( uoffset )
+  S0 @ +	( a-envp-0 )
+;
+
+( System
+  ====== )
+
+( Print the error message in c-str ulen, followed by ": ERRNO = ", followed by
+  nerrno and a newline. )
+: PERROR ( nerrno c-str ulen -- )
+  TELL
+  ." : ERRNO = "
+  . CR
+;
+
+( Exit the program normally. )
+: BYE ( -- )
+  \ exit status 0
+  0 1
+  SYS_EXIT SYSCALL
+;
+
+( Attempt to set new break via syscall brk.  If brk succeeds, a-break is greater
+  than or equal to a-break-new; otherwise a-break is the current break. )
+: BRK ( a-break-new -- a-break )
+  1 SYS_BRK SYSCALL
+;
+
+( Get current break via syscall brk. )
+: GET-BRK ( -- a-break )
+  \ NULL is never accepted by brk, so it returns the current break
+  NULL BRK
+;
+
+( Calculate number of cells in data segment after HERE. )
+: UNUSED ( -- ucells )
+  GET-BRK
+  HERE @
+  - 8 /
+;
+
+( Increase size of data segment by ucells cells.  fsuccess indicates whether the
+  allocation succeeded. )
+: MORECORE ( ucells -- fsuccess )
+  CELLS GET-BRK +	( a-break-new )
+  DUP BRK	( a-break-new a-break )
+  U<=	( fsuccess )
+;
