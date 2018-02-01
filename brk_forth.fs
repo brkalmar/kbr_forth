@@ -35,40 +35,40 @@
 \ 	0BRANCH OFFSET-FALSE-PART true-part BRANCH OFFSET-REST false-part rest
 
 \ ( -- c-offset ) Start compiling the true part of an if-expression.
-: IF IMMEDIATE
-     \ compile 0BRANCH
-     ' 0BRANCH ,
-     \ c-offset = address of offset
-     HERE @
-     \ compile dummy OFFSET
-     0 ,
-     ;
+: IF
+  \ compile 0BRANCH
+  ' 0BRANCH ,
+  \ c-offset = address of offset
+  HERE @
+  \ compile dummy OFFSET
+  0 ,
+; IMMEDIATE
 
 \ ( c-offset -- ) End compiling an if-expression.
-: THEN IMMEDIATE
-       DUP
-       \ calculate offset
-       HERE @ SWAP -
-       \ store it
-       SWAP !
-;
+: THEN
+  DUP
+  \ calculate offset
+  HERE @ SWAP -
+  \ store it
+  SWAP !
+; IMMEDIATE
 
 \ ( c-offset-false -- c-offset-rest ) Start compiling the false part of an
 \ if-else-expression.
-: ELSE IMMEDIATE
-       \ compile BRANCH
-       ' BRANCH ,
-       \ c-offset-rest = address of offset
-       HERE @
-       \ compile dummy offset-rest
-       0 ,
+: ELSE
+  \ compile BRANCH
+  ' BRANCH ,
+  \ c-offset-rest = address of offset
+  HERE @
+  \ compile dummy offset-rest
+  0 ,
 
-       SWAP DUP
-       \ calculate offset-false
-       HERE @ SWAP -
-       \ store it
-       SWAP !
-       ;
+  SWAP DUP
+  \ calculate offset-false
+  HERE @ SWAP -
+  \ store it
+  SWAP !
+; IMMEDIATE
 
 \ Loops
 \ -----
@@ -80,31 +80,31 @@
 \ 	loop-part condition 0BRANCH OFFSET-LOOP-PART
 
 \ ( -- c-begin ) Start compiling a loop.
-: BEGIN IMMEDIATE
-        \ save c-begin
-        HERE @
-        ;
+: BEGIN
+  \ save c-begin
+  HERE @
+; IMMEDIATE
 
 \ ( c-begin -- ) End compiling a begin-until loop.
-: UNTIL IMMEDIATE
-        \ compile 0BRANCH
-        ' 0BRANCH ,
-        \ calculate offset-loop-part
-        HERE @ -
-        \ compile it
-        ,
-;
+: UNTIL
+  \ compile 0BRANCH
+  ' 0BRANCH ,
+  \ calculate offset-loop-part
+  HERE @ -
+  \ compile it
+  ,
+; IMMEDIATE
 
 \ Compiling
 \ =========
 
 \ ( w -- ) Compile LIT w.
-: LITERAL IMMEDIATE
-          \ compile LIT
-          ' LIT ,
-          \ compile w
-          ,
-;
+: LITERAL
+  \ compile LIT
+  ' LIT ,
+  \ compile w
+  ,
+; IMMEDIATE
 
 \ Comments
 \ ========
@@ -114,28 +114,28 @@
 
 \ ( -- ) Start a multiline comment, which lasts until the corresponding right
 \ parenthesis.  Nested parenthesis are allowed.
-: ( IMMEDIATE
-    \ nesting depth: nr of unmatched left parentheses
-    1
-    BEGIN
-      \ read next character
-      KEY
-      \ left parenthesis: increase depth
-      DUP [ CHAR ( ] LITERAL = IF
-        DROP
-        1+
-      ELSE
-        \ right parenthesis: decrease depth
-        [ CHAR ) ] LITERAL = IF
-          1-
-        THEN
+: (
+  \ nesting depth: nr of unmatched left parentheses
+  1
+  BEGIN
+    \ read next character
+    KEY
+    \ left parenthesis: increase depth
+    DUP [ CHAR ( ] LITERAL = IF
+      DROP
+      1+
+    ELSE
+      \ right parenthesis: decrease depth
+      [ CHAR ) ] LITERAL = IF
+        1-
       THEN
-      \ stop when depth is 0: initial left parenthesis is balanced out
-      DUP 0=
-    UNTIL
-    \ discard depth
-    DROP
-;
+    THEN
+    \ stop when depth is 0: initial left parenthesis is balanced out
+    DUP 0=
+  UNTIL
+  \ discard depth
+  DROP
+; IMMEDIATE
 
 ( From now on ( ... ) comments shall be used where appropriate.
 
@@ -147,15 +147,16 @@ Compiling
 	: EXAMPLE_WORD ... [COMPILE] IF ... ;
 
 would compile IF into EXAMPLE_WORD instead of executing it. )
-: [COMPILE] IMMEDIATE ( -- )
-            WORD FIND >CFA , ;
+: [COMPILE] ( -- )
+  WORD FIND >CFA ,
+; IMMEDIATE
 
 ( Compile a recursive call to the currently compiling word. )
-: RECURSE IMMEDIATE ( -- )
-          LATEST @
-          >CFA
-          ,
-;
+: RECURSE ( -- )
+  LATEST @
+  >CFA
+  ,
+; IMMEDIATE
 
 ( Booleans
   ======== )
@@ -184,14 +185,14 @@ compiles to
 	loop-part BRANCH OFFSET-LOOP-PART )
 
 ( End compiling an infinite loop. )
-: AGAIN IMMEDIATE ( c-begin -- )
-        \ compile BRANCH
-        ' BRANCH ,
-        \ calculate offset-loop-part
-        HERE @ -
-        \ compile it
-        ,
-       ;
+: AGAIN ( c-begin -- )
+  \ compile BRANCH
+  ' BRANCH ,
+  \ calculate offset-loop-part
+  HERE @ -
+  \ compile it
+  ,
+; IMMEDIATE
 
 ( 	BEGIN condition WHILE loop-part REPEAT rest
 
@@ -200,30 +201,30 @@ compiles to
 	condition 0BRANCH OFFSET-REST loop-part BRANCH OFFSET-CONDITION rest )
 
 ( Start compiling loop part of a while-loop. )
-: WHILE IMMEDIATE ( -- c-offset-rest )
-        \ compile 0BRANCH
-        ' 0BRANCH ,
-        \ save c-offset-rest
-        HERE @
-        \ compile dummy offset-rest
-        0 ,
-        ;
+: WHILE ( -- c-offset-rest )
+  \ compile 0BRANCH
+  ' 0BRANCH ,
+  \ save c-offset-rest
+  HERE @
+  \ compile dummy offset-rest
+  0 ,
+; IMMEDIATE
 
 ( End compiling a while-loop. )
-: REPEAT IMMEDIATE ( c-begin c-offset-rest -- )
-         \ compile BRANCH
-         ' BRANCH ,
-         \ calculate offset-condition
-         SWAP
-         HERE @ -
-         \ compile it
-         ,
-         \ calculate offset-rest
-         DUP
-         HERE @ SWAP -
-         \ store it
-         SWAP !
-       ;
+: REPEAT ( c-begin c-offset-rest -- )
+  \ compile BRANCH
+  ' BRANCH ,
+  \ calculate offset-condition
+  SWAP
+  HERE @ -
+  \ compile it
+  ,
+  \ calculate offset-rest
+  DUP
+  HERE @ SWAP -
+  \ store it
+  SWAP !
+; IMMEDIATE
 
 ( If-expressions
   --------------
@@ -235,12 +236,12 @@ is equivalent to
 	NOT IF ... )
 
 ( Start compiling the true part of an unless-expression. )
-: UNLESS IMMEDIATE ( -- c-offset )
-         \ compile NOT
-         ' NOT ,
-         \ compile IF
-         [COMPILE] IF
-           ;
+: UNLESS ( -- c-offset )
+  \ compile NOT
+  ' NOT ,
+  \ compile IF
+  [COMPILE] IF
+; IMMEDIATE
 
 ( Base manipulation
   ================= )
@@ -289,9 +290,9 @@ is equivalent to
 ;
 
 ( Parse the following word as a base-10 number. )
-: [DECIMAL] IMMEDIATE ( -- )
+: [DECIMAL] ( -- )
   10 NUMBER-BASE
-;
+; IMMEDIATE
 
 ( Switch to base-16. )
 : HEX ( -- )
@@ -299,9 +300,9 @@ is equivalent to
 ;
 
 ( Parse the following word as a base-16 number. )
-: [HEX] IMMEDIATE ( -- )
+: [HEX] ( -- )
   16 NUMBER-BASE
-;
+; IMMEDIATE
 
 ( Switch to base-8. )
 : OCTAL
@@ -309,9 +310,9 @@ is equivalent to
 ;
 
 ( Parse the following word as a base-8 number. )
-: [OCTAL] IMMEDIATE ( -- )
+: [OCTAL] ( -- )
   8 NUMBER-BASE
-;
+; IMMEDIATE
 
 ( Switch to base-2. )
 : BINARY
@@ -319,9 +320,9 @@ is equivalent to
 ;
 
 ( Parse the following word as a base-2 number. )
-: [BINARY] IMMEDIATE ( -- )
+: [BINARY] ( -- )
   2 NUMBER-BASE
-;
+; IMMEDIATE
 
 \ auxiliary word
 HIDE NUMBER-BASE
@@ -665,66 +666,66 @@ HIDE .STACK
 	LITSTRING ulen c-str padding
 
 at HERE, and increment HERE to point after padding. )
-: S" IMMEDIATE ( -- c-str ulen )
-     STATE @ IF
-       \ compile LITSTRING
-       ' LITSTRING ,
-       \ preserve address of string length	( a-len )
-       HERE @
-       \ compile dummy length
-       0 ,
-       \ read and compile string itself
-       BEGIN
-         KEY
-         DUP [ CHAR " ] LITERAL <>
-       WHILE	( a-len c )
-         C,
-       REPEAT
-       DROP	( a-len )
-       \ calculate and save length
-       DUP
-       HERE @	( a-len a-len c-end )
-       \ subtract 8 because a-len points to start of length, not string
-       SWAP - 8-	( a-len ulen )
-       SWAP !
-       \ compile padding
-       ALIGN
-     ELSE
-       HERE @	( c-str-end )
-       \ read and store string
-       BEGIN
-         KEY
-         DUP [ CHAR " ] LITERAL <>
-       WHILE	( c-str-end c )
-         OVER C!
-         1+
-       REPEAT
-       DROP	( c-str-end )
-       HERE @ -	( ulen )
-       HERE @ SWAP	( c-str ulen )
-     THEN
-;
+: S" ( -- c-str ulen )
+  STATE @ IF
+    \ compile LITSTRING
+    ' LITSTRING ,
+    \ preserve address of string length	( a-len )
+    HERE @
+    \ compile dummy length
+    0 ,
+    \ read and compile string itself
+    BEGIN
+      KEY
+      DUP [ CHAR " ] LITERAL <>
+    WHILE	( a-len c )
+      C,
+    REPEAT
+    DROP	( a-len )
+    \ calculate and save length
+    DUP
+    HERE @	( a-len a-len c-end )
+    \ subtract 8 because a-len points to start of length, not string
+    SWAP - 8-	( a-len ulen )
+    SWAP !
+    \ compile padding
+    ALIGN
+  ELSE
+    HERE @	( c-str-end )
+    \ read and store string
+    BEGIN
+      KEY
+      DUP [ CHAR " ] LITERAL <>
+    WHILE	( c-str-end c )
+      OVER C!
+      1+
+    REPEAT
+    DROP	( c-str-end )
+    HERE @ -	( ulen )
+    HERE @ SWAP	( c-str ulen )
+  THEN
+; IMMEDIATE
 
 ( Parse the following input until the next quotation mark as a string, and print
   it to stdout.  In compiling mode, compile it as if compiling S" followed by
   TELL. )
-: ." IMMEDIATE ( -- )
-     STATE @ IF
-       \ call S", which compiles LITSTRING ulen c-str padding
-       [COMPILE] S"
-       \ compile TELL
-       ' TELL ,
-     ELSE
-       \ read bytes and emit each one until a quotation mark is encountered
-       BEGIN
-         KEY
-         DUP [ CHAR " ] LITERAL <>
-       WHILE
-         EMIT
-       REPEAT
-       DROP
-     THEN
-;
+: ." ( -- )
+  STATE @ IF
+    \ call S", which compiles LITSTRING ulen c-str padding
+    [COMPILE] S"
+    \ compile TELL
+    ' TELL ,
+  ELSE
+    \ read bytes and emit each one until a quotation mark is encountered
+    BEGIN
+      KEY
+      DUP [ CHAR " ] LITERAL <>
+    WHILE
+      EMIT
+    REPEAT
+    DROP
+  THEN
+; IMMEDIATE
 
 ( Constants, variables, values
   ============================
@@ -849,34 +850,34 @@ The following simple example demonstrates how values are defined and used.
 ;
 
 ( Store w in the value with the same name as the following word. )
-: TO IMMEDIATE ( w -- )
-     WORD FIND
-     >DFA 8+
-     STATE @ IF	( a-contents )
-       \ compile LIT a-contents !
-       ' LIT ,
-       ,
-       ' ! ,
-     ELSE	( w a-contents )
-       \ immediate mode: simply store w
-       !
-     THEN
-;
+: TO ( w -- )
+  WORD FIND
+  >DFA 8+
+  STATE @ IF	( a-contents )
+    \ compile LIT a-contents !
+    ' LIT ,
+    ,
+    ' ! ,
+  ELSE	( w a-contents )
+    \ immediate mode: simply store w
+    !
+  THEN
+; IMMEDIATE
 
 ( Add u to the value with the same name as the following word. )
-: +TO IMMEDIATE ( u -- )
-      WORD FIND
-      >DFA 8+
-      STATE @ IF
-        \ compile LIT a-contents +!
-        ' LIT ,
-        ,
-        ' +! ,
-      ELSE
-        \ immediate mode: simply add u
-        +!
+: +TO ( u -- )
+  WORD FIND
+  >DFA 8+
+  STATE @ IF
+    \ compile LIT a-contents +!
+    ' LIT ,
+    ,
+    ' +! ,
+  ELSE
+    \ immediate mode: simply add u
+    +!
       THEN
-;
+; IMMEDIATE
 
 ( Printing
   ======== )
@@ -1053,37 +1054,37 @@ compiles to nested if-else expressions, one if-expression for each test
 	THEN )
 
 ( Start compiling a case-expression. )
-: CASE IMMEDIATE ( -- c-null )
-       \ NULL to mark last IF to compile a THEN for
-       NULL
-       ;
+: CASE ( -- c-null )
+  \ NULL to mark last IF to compile a THEN for
+  NULL
+; IMMEDIATE
 
 ( Start compiling an execution branch of a case-expression. )
-: OF IMMEDIATE ( -- c-offset-false )
-     ' OVER ,
-     ' = ,
-     [COMPILE] IF
-     ' DROP ,
-     ;
+: OF ( -- c-offset-false )
+  ' OVER ,
+  ' = ,
+  [COMPILE] IF
+  ' DROP ,
+; IMMEDIATE
 
 ( End compiling an execution branch of a case-expression, start compiling the
   next test or the default-branch. )
-: ENDOF IMMEDIATE ( c-offset-false -- c-offset-rest )
-        [COMPILE] ELSE
-       ;
+: ENDOF ( c-offset-false -- c-offset-rest )
+  [COMPILE] ELSE
+; IMMEDIATE
 
 ( End compiling a case-expression. )
-: ENDCASE IMMEDIATE
-          ( c-null c-offset-rest-1 c-offset-rest-2 ... c-offset-rest-n -- )
-          ' DROP ,
-          BEGIN
-            \ while current offset is not NULL
-            ?DUP
-          WHILE
-            \ compile matching THEN
-            [COMPILE] THEN
-          REPEAT
-       ;
+: ENDCASE
+  ( c-null c-offset-rest-1 c-offset-rest-2 ... c-offset-rest-n -- )
+  ' DROP ,
+  BEGIN
+    \ while current offset is not NULL
+    ?DUP
+  WHILE
+    \ compile matching THEN
+    [COMPILE] THEN
+  REPEAT
+; IMMEDIATE
 
 ( Decompiling
   =========== )
@@ -1225,22 +1226,22 @@ an execution token for the new word on stack. )
 
 ( Get execution token of the following word from stdin.  Only works in compiled
   words. )
-: ['] IMMEDIATE ( -- xt )
-      \ compile LIT
-      ' LIT ,
-;
+: ['] ( -- xt )
+  \ compile LIT
+  ' LIT ,
+; IMMEDIATE
 
 ( Start compilation of anonymous word; enter compiling mode.  xt is the
   execution token of the anonymous word. )
 : :NONAME ( -- xt )
-    \ create dictionary header with empty name
-    NULL 0 CREATE
-    HERE @	( xt )
-    \ compile codeword
-    DOCOL ,
-    \ compile the anoymous word
-    ]
-  ;
+  \ create dictionary header with empty name
+  NULL 0 CREATE
+  HERE @	( xt )
+  \ compile codeword
+  DOCOL ,
+  \ compile the anoymous word
+  ]
+;
 
 ( Exceptions
   ==========
@@ -1418,47 +1419,47 @@ FORTH string is done using STRLEN, via the expression DUP STRLEN. )
 	LITSTRING ulen c-str-z padding DROP
 
 at HERE, and increment HERE to point after padding. )
-: Z" IMMEDIATE ( -- c-str-z )
-     STATE @ IF
-       \ LITSTRING
-       ' LITSTRING ,
-       HERE @	( a-len )
-       \ dummy length
-       0 ,
-       \ the string
-       BEGIN
-         KEY
-         DUP [ CHAR " ] LITERAL <>
-       WHILE	( a-len c )
-         C,
-       REPEAT
-       DROP	( a-len )
-       \ terminating NULL byte
-       '0 C,
-       \ calculate and save length
-       DUP HERE @	( a-len a-len c-end )
-       SWAP - 8-	( a-len ulen )
-       SWAP !
-       \ padding
-       ALIGN
-       \ DROP to drop ulen after LITSTRING pushed it
-       ' DROP ,
-     ELSE
-       HERE @	( c-str-z-end )
-       \ the string
-       BEGIN
-         KEY
-         DUP [ CHAR " ] LITERAL <>
-       WHILE	( c-str-z-end c )
-         OVER C!
-         1+
-       REPEAT
-       DROP	( c-str-z-end )
-       \ terminating NULL byte
-       '0 SWAP C!
-       HERE @	( c-str-z )
-     THEN
-;
+: Z" ( -- c-str-z )
+  STATE @ IF
+    \ LITSTRING
+    ' LITSTRING ,
+    HERE @	( a-len )
+    \ dummy length
+    0 ,
+    \ the string
+    BEGIN
+      KEY
+      DUP [ CHAR " ] LITERAL <>
+    WHILE	( a-len c )
+      C,
+    REPEAT
+    DROP	( a-len )
+    \ terminating NULL byte
+    '0 C,
+    \ calculate and save length
+    DUP HERE @	( a-len a-len c-end )
+    SWAP - 8-	( a-len ulen )
+    SWAP !
+    \ padding
+    ALIGN
+    \ DROP to drop ulen after LITSTRING pushed it
+    ' DROP ,
+  ELSE
+    HERE @	( c-str-z-end )
+    \ the string
+    BEGIN
+      KEY
+      DUP [ CHAR " ] LITERAL <>
+    WHILE	( c-str-z-end c )
+      OVER C!
+      1+
+    REPEAT
+    DROP	( c-str-z-end )
+    \ terminating NULL byte
+    '0 SWAP C!
+    HERE @	( c-str-z )
+  THEN
+; IMMEDIATE
 
 ( Count the length of a C string, i.e. the number of bytes starting at c-str-z
   and not including the terminating NULL byte. )
