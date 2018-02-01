@@ -1667,3 +1667,305 @@ envp[n] is NULL. )
 
 \ auxiliary word
 HIDE WITH-ERRNO
+
+( Assembly in FORTH
+  =================
+
+Assembly words are defined similaryly to FORTH words.
+
+	: WORD-NAME [ assembler-code ... ] ;CODE
+
+;CODE works analogously to ;, except it appends NEXT instead of EXIT at the end
+of the word's definition, and it replaces DOCOL with a pointer to the assembler
+code in the word definition.
+
+Within assembly words, the programmer may use machine instructions directly via
+compiling literals, e.g.
+
+	[HEX] F7 C, [BINARY] 11_101_011 C,	( imul EBX )
+	[HEX] 89 C, [BINARY] 11_000_010 C,	( mov EDX, EAX )
+
+or indirectly via immediate FORTH words that compile down to machine code, e.g.
+
+	EBX IMUL
+	EDX EAX MOV )
+
+( Inserted at the end of assembler-words. )
+: NEXT
+  \ lodsq
+  \  REX : W
+  [BINARY] 0100_1_0_0_0 C,
+  \  AD
+  [HEX] AD C,
+  \ jmp [RAX] : absolute indirect
+  \  FF
+  [HEX] FF C,
+  \  ModR/M : mod = unused, opcode-ext = 4, r/m = RAX
+  [BINARY] 00_100_000 C,
+; IMMEDIATE
+
+( Terminate the definition of an assembler-word.  Corresponds to the previous
+  :. )
+: ;CODE ( -- )
+  \ insert NEXT
+  [COMPILE] NEXT
+  ALIGN
+  LATEST @ DUP	( a-word a-word )
+  \ turn off hidden flag
+  HIDDEN	( a-word )
+  \ store pointer to DFA in codeword
+  DUP >DFA SWAP >CFA	( a-dfa a-cfa )
+  !
+  \ exit compiling mode
+  [COMPILE] [
+; IMMEDIATE
+
+( Operands to assembly instructions are reprensented by 2 cells.  The top one is
+  the type of the operand, one of the ASM-* constants, the bottom one is the
+  value, whose interpretation is determined by the type. )
+
+( Immediate byte value. )
+000 CONSTANT ASM-IMM8
+
+( Immediate word value. )
+001 CONSTANT ASM-IMM16
+
+( Immediate doubleword value. )
+002 CONSTANT ASM-IMM32
+
+( Immediate quadword value. )
+003 CONSTANT ASM-IMM64
+
+( General-purpose byte register. AL through R15L. )
+100 CONSTANT ASM-R8
+
+( General-purpose word register. AX through R15W. )
+101 CONSTANT ASM-R16
+
+( General-purpose doubleword register. EAX through R15D. )
+102 CONSTANT ASM-R32
+
+( General-purpose quadword register. RAX through R15. )
+103 CONSTANT ASM-R64
+
+( Direct absolute address, word offset. )
+200 CONSTANT ASM-PTR16:16
+
+( Direct absolute address, doubleword offset. )
+201 CONSTANT ASM-PTR16:32
+
+( Direct relative byte address. )
+300 CONSTANT ASM-REL8
+
+( Direct relative word address. )
+301 CONSTANT ASM-REL16
+
+( Direct relative doubleword address. )
+302 CONSTANT ASM-REL32
+
+( Memory byte effective address. )
+400 CONSTANT ASM-M8
+
+( Memory word effective address. )
+401 CONSTANT ASM-M16
+
+( Memory doubleword effective address. )
+402 CONSTANT ASM-M32
+
+( Memory quadword effective address. )
+403 CONSTANT ASM-M64
+
+( Indirect absolute address, word offset. )
+500 CONSTANT ASM-M16:16
+
+( Indirect absolute address, doubleword offset. )
+500 CONSTANT ASM-M16:32
+
+( Indirect absolute address, quadword offset. )
+500 CONSTANT ASM-M16:64
+
+HEX
+
+( Choose the smalles AMS-IMM* type which nimm fits into. )
+: ASM:IMM ( nimm -- nimm utype )
+  DUP -80 >= OVER 7F <= AND IF
+    ASM-IMM8
+  ELSE
+    DUP -8000 >= OVER 7FFF <= AND IF
+      ASM-IMM16
+    ELSE
+      DUP -80000000 >= OVER 7FFFFFFF <= AND IF
+        ASM-IMM32
+      ELSE
+        ASM-IMM64
+      THEN
+    THEN
+  THEN
+; IMMEDIATE
+
+( Choose the smallest ASM-IMM* type which uimm fits into. )
+: ASM:UIMM ( uimm -- uimm utype )
+  DUP FF U<= IF
+    ASM-IMM8
+  ELSE
+    DUP FFFF U<= IF
+      ASM-IMM16
+    ELSE
+      DUP FFFFFFFF U<= IF
+        ASM-IMM32
+      ELSE
+        ASM-IMM64
+      THEN
+    THEN
+  THEN
+; IMMEDIATE
+
+OCTAL
+
+: ASM:AL   00 ASM-R8 ; IMMEDIATE
+: ASM:CL   01 ASM-R8 ; IMMEDIATE
+: ASM:DL   02 ASM-R8 ; IMMEDIATE
+: ASM:BL   03 ASM-R8 ; IMMEDIATE
+: ASM:SPL  04 ASM-R8 ; IMMEDIATE
+: ASM:BPL  05 ASM-R8 ; IMMEDIATE
+: ASM:SIL  06 ASM-R8 ; IMMEDIATE
+: ASM:DIL  07 ASM-R8 ; IMMEDIATE
+: ASM:R8L  10 ASM-R8 ; IMMEDIATE
+: ASM:R9L  11 ASM-R8 ; IMMEDIATE
+: ASM:R10L 12 ASM-R8 ; IMMEDIATE
+: ASM:R11L 13 ASM-R8 ; IMMEDIATE
+: ASM:R12L 14 ASM-R8 ; IMMEDIATE
+: ASM:R13L 15 ASM-R8 ; IMMEDIATE
+: ASM:R14L 16 ASM-R8 ; IMMEDIATE
+: ASM:R15L 17 ASM-R8 ; IMMEDIATE
+
+: ASM:AX   00 ASM-R16 ; IMMEDIATE
+: ASM:CX   01 ASM-R16 ; IMMEDIATE
+: ASM:DX   02 ASM-R16 ; IMMEDIATE
+: ASM:BX   03 ASM-R16 ; IMMEDIATE
+: ASM:SP   04 ASM-R16 ; IMMEDIATE
+: ASM:BP   05 ASM-R16 ; IMMEDIATE
+: ASM:SI   06 ASM-R16 ; IMMEDIATE
+: ASM:DI   07 ASM-R16 ; IMMEDIATE
+: ASM:R8W  10 ASM-R16 ; IMMEDIATE
+: ASM:R9W  11 ASM-R16 ; IMMEDIATE
+: ASM:R10W 12 ASM-R16 ; IMMEDIATE
+: ASM:R11W 13 ASM-R16 ; IMMEDIATE
+: ASM:R12W 14 ASM-R16 ; IMMEDIATE
+: ASM:R13W 15 ASM-R16 ; IMMEDIATE
+: ASM:R14W 16 ASM-R16 ; IMMEDIATE
+: ASM:R15W 17 ASM-R16 ; IMMEDIATE
+
+: ASM:EAX  00 ASM-R32 ; IMMEDIATE
+: ASM:ECX  01 ASM-R32 ; IMMEDIATE
+: ASM:EDX  02 ASM-R32 ; IMMEDIATE
+: ASM:EBX  03 ASM-R32 ; IMMEDIATE
+: ASM:ESP  04 ASM-R32 ; IMMEDIATE
+: ASM:EBP  05 ASM-R32 ; IMMEDIATE
+: ASM:ESI  06 ASM-R32 ; IMMEDIATE
+: ASM:EDI  07 ASM-R32 ; IMMEDIATE
+: ASM:R8D  10 ASM-R32 ; IMMEDIATE
+: ASM:R9D  11 ASM-R32 ; IMMEDIATE
+: ASM:R10D 12 ASM-R32 ; IMMEDIATE
+: ASM:R11D 13 ASM-R32 ; IMMEDIATE
+: ASM:R12D 14 ASM-R32 ; IMMEDIATE
+: ASM:R13D 15 ASM-R32 ; IMMEDIATE
+: ASM:R14D 16 ASM-R32 ; IMMEDIATE
+: ASM:R15D 17 ASM-R32 ; IMMEDIATE
+
+: ASM:RAX  00 ASM-R64 ; IMMEDIATE
+: ASM:RCX  01 ASM-R64 ; IMMEDIATE
+: ASM:RDX  02 ASM-R64 ; IMMEDIATE
+: ASM:RBX  03 ASM-R64 ; IMMEDIATE
+: ASM:RSP  04 ASM-R64 ; IMMEDIATE
+: ASM:RBP  05 ASM-R64 ; IMMEDIATE
+: ASM:RSI  06 ASM-R64 ; IMMEDIATE
+: ASM:RDI  07 ASM-R64 ; IMMEDIATE
+: ASM:R8   10 ASM-R64 ; IMMEDIATE
+: ASM:R9   11 ASM-R64 ; IMMEDIATE
+: ASM:R10  12 ASM-R64 ; IMMEDIATE
+: ASM:R11  13 ASM-R64 ; IMMEDIATE
+: ASM:R12  14 ASM-R64 ; IMMEDIATE
+: ASM:R13  15 ASM-R64 ; IMMEDIATE
+: ASM:R14  16 ASM-R64 ; IMMEDIATE
+: ASM:R15  17 ASM-R64 ; IMMEDIATE
+
+DECIMAL
+
+( Store word (lower 16 bits) in w at HERE in little-endian form, and increment
+  HERE to point one past the stored word. )
+: W, ( w -- )
+  DUP C,
+  8 >> C,
+;
+
+( Store doubleword (lower 32 bits) in w at HERE in little-endian form, and
+  increment HERE to point one paste the stored doubleword. )
+: D, ( w -- )
+  DUP C,
+  8 >> DUP C,
+  8 >> DUP C,
+  8 >> C,
+;
+
+HEX
+
+( Instruction prefix operand-size override. )
+66 CONSTANT ASM-PREFIX-OPERAND-SO
+
+( Instruction prefix address-size override. )
+67 CONSTANT ASM:PREFIX-ADDRESS-SO
+
+( Instruction prefix REX with no flags set. )
+[BINARY] 0100_0000 CONSTANT ASM-PREFIX-REX
+
+( Instruction prefix REX with flag B set. )
+ASM-PREFIX-REX [BINARY] 0001 OR CONSTANT ASM-PREFIX-REX.B
+
+( Instruction prefix REX with flag X set. )
+ASM-PREFIX-REX [BINARY] 0010 OR CONSTANT ASM-PREFIX-REX.X
+
+( Instruction prefix REX with flag R set. )
+ASM-PREFIX-REX [BINARY] 0100 OR CONSTANT ASM-PREFIX-REX.R
+
+( Instruction prefix REX with flag W set. )
+ASM-PREFIX-REX [BINARY] 1000 OR CONSTANT ASM-PREFIX-REX.W
+
+( Compile instruction PUSH operand1. )
+: ASM:PUSH ( woperand1 utype1 -- )
+  CASE
+    ASM-IMM8 OF
+      6A C,
+      C,
+    ENDOF
+    ASM-IMM16 OF
+      ASM-PREFIX-OPERAND-SO C,
+      68 C,
+      W,
+    ENDOF
+    ASM-IMM32 OF
+      68 C,
+      D,
+    ENDOF
+    ASM-R16 OF
+      ASM-PREFIX-OPERAND-SO C,
+      DUP [BINARY] 1000 AND IF
+        [BINARY] 0111 AND
+        ASM-PREFIX-REX.B C,
+      THEN
+      50 OR C,
+    ENDOF
+    ASM-R64 OF
+      DUP [BINARY] 1000 AND IF
+        [BINARY] 0111 AND
+        ASM-PREFIX-REX.B C,
+      THEN
+      50 OR C,
+    ENDOF
+    \ TODO: not implemented: r/m16, r/m64, FS, GS
+    ." ERROR: invalid operand type for PUSH: " DUP U. CR
+    NIP
+  ENDCASE
+; IMMEDIATE
+
+DECIMAL

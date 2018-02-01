@@ -802,6 +802,45 @@ code_\label :
 	not	qword ptr [rsp]
 	NEXT
 
+	/* Auxiliary macro used by bitwise shifts. */
+	.macro	pop_shift_count	reg:req
+	DS_POP	\reg
+#ifndef	NDEBUG
+	cmp	\reg,	63
+	jbe	1f
+	fatal_error	"bitwise shift count greater than 63"
+1:
+#endif
+	.endm
+
+	/* ( w1 ucount -- wr ) Shift w1 ucount bits to the left, filling with
+	0-bits on the right.  ucount must not be greater than 63.
+	*/
+	define_code	$LESS_THAN_SIGN$$LESS_THAN_SIGN$,	"<<"
+	DS_MIN_SIZE	2
+	pop_shift_count	rcx
+	shl	qword ptr [rsp],	cl
+	NEXT
+
+	/* ( w1 ucount -- wr ) Shift w1 ucount bits to the right, filling with
+	0-bits on the left.  ucount must not be greater than 63.
+	*/
+	define_code	$GREATER_THAN_SIGN$$GREATER_THAN_SIGN$,	">>"
+	DS_MIN_SIZE	2
+	pop_shift_count	rcx
+	shr	qword ptr [rsp],	cl
+	NEXT
+
+	/* ( w1 ucount -- wr ) Shift w1 ucount bits to the right, filling with
+	w1's sign bit on the left (arithmetic shift).  ucount must not be
+	greater than 63.
+	*/
+	define_code	A$GREATER_THAN_SIGN$$GREATER_THAN_SIGN$,	"A>>"
+	DS_MIN_SIZE	2
+	pop_shift_count	rcx
+	sar	qword ptr [rsp],	cl
+	NEXT
+
 	/* Special words
 	   -------------
 	*/
@@ -2005,8 +2044,8 @@ _$GREATER_THAN_SIGN$CFA:
 	// writing outside data segment is left to be detected by the system
 	NEXT
 
-	/* ( w -- ) Store w at space starting at HERE and increment HERE to
-	point one past the stored cell.
+	/* ( w -- ) Store w in space starting at HERE in little-endian form, and
+	increment HERE to point one past the stored cell.
 	*/
 	define_code	$COMMA$,	","
 	DS_POP	rax
