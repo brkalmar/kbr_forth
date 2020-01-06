@@ -1,15 +1,15 @@
-	/* brk_forth: B. R. K.'s simple FORTH compiler for x86-64 GNU/Linux.
+	/* kbr_forth: K. B. R.'s simple FORTH compiler for x86-64 GNU/Linux.
 
 	Based on the public domain FORTH compiler `jonesforth` by Richard
 	W. M. Jones <rich@annexia.org> http://annexia.org/forth.
 
 	License: Creative Commons 0 (CC0)
 	<http://creativecommons.org/publicdomain/zero/1.0/>.  To the extent
-	possible under law, B. R. K. has waived all copyright and related or
-	neighboring rights to `brk_forth`.
+	possible under law, K. B. R. has waived all copyright and related or
+	neighboring rights to `kbr_forth`.
 	*/
 
-	/* This file contains the basic assembly implementation of brk_forth.
+	/* This file contains the basic assembly implementation of kbr_forth.
 	It uses GNU as-specific syntax and should be assembled by GCC (see
 	`Makefile`).
 	*/
@@ -20,9 +20,9 @@
 #include	<asm/unistd.h>
 
 	// Version.
-	.set	BRK_FORTH_VERSION_MAJOR,	0
-	.set	BRK_FORTH_VERSION_MINOR,	1
-	.set	BRK_FORTH_VERSION_PATCH,	0
+	.set	KBR_FORTH_VERSION_MAJOR,	0
+	.set	KBR_FORTH_VERSION_MINOR,	1
+	.set	KBR_FORTH_VERSION_PATCH,	0
 
 	/* fatal_error prints string error_msg preceded by "FATAL ERROR: " and
 	followed by a newline to stderr, and exits the program with exit status
@@ -1027,17 +1027,17 @@ var_\label :
 	/* ( -- u ) The major version of this FORTH.  major in
 	major.minor.patch.
 	*/
-	define_constant	VERSION_MAJOR,	"VERSION_MAJOR",	"offset BRK_FORTH_VERSION_MAJOR"
+	define_constant	VERSION_MAJOR,	"VERSION_MAJOR",	"offset KBR_FORTH_VERSION_MAJOR"
 
 	/* ( -- u ) The minor version of this FORTH.  minor in
 	major.minor.patch.
 	*/
-	define_constant	VERSION_MINOR,	"VERSION_MINOR",	"offset BRK_FORTH_VERSION_MINOR"
+	define_constant	VERSION_MINOR,	"VERSION_MINOR",	"offset KBR_FORTH_VERSION_MINOR"
 
 	/* ( -- u ) The patch version of this FORTH.  patch in
 	major.minor.patch.
 	*/
-	define_constant	VERSION_PATCH,	"VERSION_PATCH",	"offset BRK_FORTH_VERSION_PATCH"
+	define_constant	VERSION_PATCH,	"VERSION_PATCH",	"offset KBR_FORTH_VERSION_PATCH"
 
 	/* ( -- umajor uminor upatch ) The full version major.minor.patch of
 	this FORTH.
@@ -2621,5 +2621,5 @@ emit_buffer_end:
 	/* FORTH code
 	   ==========
 
-	The rest of the implementation of brk_forth is in `brk_forth.f`.
+	The rest of the implementation of kbr_forth is in `kbr_forth.fs`.
 	*/

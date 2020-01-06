@@ -1,10 +1,10 @@
-# Makefile for brk_forth.  GNU make is recommended.
+# Makefile for kbr_forth.  GNU make is recommended.
 #
 # Compiling all files:
 #
 # 	make all
 #
-# Running the brk_forth interpreter on its own:
+# Running the kbr_forth interpreter on its own:
 #
 # 	make run
 #
@@ -31,7 +31,7 @@ else
 endif
 
 
-BIN       = brk_forth
+BIN       = kbr_forth
 BIN_FORTH = $(BIN).fs
 
 $(BIN) : $(BIN).S

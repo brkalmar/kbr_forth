@@ -1,15 +1,15 @@
-\ brk_forth: B. R. K.'s simple FORTH compiler for x86-64 GNU/Linux.
+\ kbr_forth: K. B. R's simple FORTH compiler for x86-64 GNU/Linux.
 \
 \ Based on the public domain FORTH compiler `jonesforth` by Richard W. M. Jones
 \ <rich@annexia.org> http://annexia.org/forth.
 \
 \ License: Creative Commons 0 (CC0)
 \ <http://creativecommons.org/publicdomain/zero/1.0/>.  To the extent possible
-\ under law, B. R. K. has waived all copyright and related or neighboring rights
-\ to `brk_forth`.
+\ under law, K. B. R. has waived all copyright and related or neighboring rights
+\ to `kbr_forth`.
 
-\ This file contains the rest of the implementation of brk_forth, continued from
-\ `brk_forth.S`.
+\ This file contains the rest of the implementation of kbr_forth, continued from
+\ `kbr_forth.S`.
 
 \ Control structures
 \ ==================
